@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Python</title>
+  <style type="text/css" media="screen">
+body {
+  background-color: white;
+  color: black;
+}
+output {
+  display: block;
+  margin-bottom: 1em;
+  margin-left: 1em;
+}
+.food {
+  background-color: yellow;
+}
+.snake {
+  background-color: blue;
+}
+pre {
+  font-family: "Courier New", monospace;
+  font-size: 20px;
+  line-height: 20px;
+  text-transform: full-width;
+}
+canvas {
+  border: 1px solid black;
+}
+table {
+  border: 1px solid black;
+  border-collapse: collapse;
+  margin: 0;
+  padding: 0;
+}
+td {
+  height: 20px;
+  width: 20px;
+}
+  </style>
+</head>
+
+<body>
+
+<main>
+<h1>Python</h1>
+
+<output id="board"></output>
+
+<p>Guide the snake to the food to help it grow longer.</p>
+
+<p>Running Python in the browser.</p>
+</main>
+
+<script>
+class Board {
+  constructor(width, height) {
+    this.width = Math.max(1, width);
+    this.height = Math.max(1, height);
+
+    /*
+     * Number of milliseconds to wait between updates
+     */
+    this.delay = 100;
+
+    let centerX = Math.floor(this.width / 2),
+        centerY = Math.floor(this.height / 2);
+    this.snake = [
+      {x: centerX, y: centerY},
+      {x: centerX, y: centerY + 1},
+      {x: centerX, y: centerY + 2}
+    ]
+    this.spawnFood();
+
+    this.xSpeed = 0;
+    this.ySpeed = -1;
+  }
+  spawnFood() {
+    let x = Board.getRandomInteger(0, this.width),
+        y = Board.getRandomInteger(0, this.height);
+    while (this.snake.some(s => ((s.x == x) && (s.y == y)))) {
+      // Respawn food if it ends up inside the snake
+      x = Board.getRandomInteger(0, this.width);
+      y = Board.getRandomInteger(0, this.height);
+    }
+    this.food = {x: x, y: y};
+  }
+  update() {
+    let board = new Board(this.width, this.height),
+        x = this.snake[0].x + this.xSpeed,
+        y = this.snake[0].y + this.ySpeed,
+        newFood = false;
+    if ((x < 0) || (y < 0) || (x >= this.width) || (y >= this.width)) {
+      // If the snake hit the wall
+      return board;
+    }
+    if (this.snake.some(s => ((s.x == x) && (s.y == y)))) {
+      // If the snake ate its own tail
+      return board;
+    }
+
+    /*
+     * At this point, the snake has not collided with the wall or itself
+     */
+    if ((this.food.x == x) && (this.food.y == y)) {
+      // If the snake ate the food
+      board.snake = this.snake.slice();
+      newFood = true;
+    }
+    else {
+      board.snake = this.snake.slice(0, this.snake.length - 1);
+    }
+    board.snake.unshift({x: x, y: y});
+
+    if (newFood) {
+      board.spawnFood();
+    }
+    else {
+      board.food.x = this.food.x;
+      board.food.y = this.food.y;
+    }
+
+    board.xSpeed = this.xSpeed;
+    board.ySpeed = this.ySpeed;
+
+    return board;
+  }
+
+  /*
+   * Check the key being pressed while
+   * ensuring the snake cannot reverse on itself.
+   */
+  keydown(event) {
+    let key = event.key;
+    if ((key == 'ArrowUp') && (this.ySpeed != 1)) {
+      this.xSpeed = 0;
+      this.ySpeed = -1;
+    }
+    if ((key == 'ArrowDown') && (this.ySpeed != -1)) {
+      this.xSpeed = 0;
+      this.ySpeed = 1;
+    }
+    if ((key == 'ArrowRight') && (this.xSpeed != -1)) {
+      this.xSpeed = 1;
+      this.ySpeed = 0;
+    }
+    if ((key == 'ArrowLeft') && (this.xSpeed != 1)) {
+      this.xSpeed = -1;
+      this.ySpeed = 0;
+    }
+  }
+
+  /*
+   * Return a random integer in [min, max).
+   */
+  static getRandomInteger(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min)) + min;
+  }
+
+  /*
+   * A short test suite to confirm the Board class works.
+   */
+  static test() {
+    let board = new Board(10, 10);
+    console.assert(board.width >= 1,
+                   {msg: 'board.width not initialized.'});
+    console.assert(board.height >= 1,
+                   {msg: 'board.width not initialized.'});
+  }
+}
+Board.test();
+
+class Display {
+  constructor(parent) {
+    if (!(parent instanceof Node)) {
+      throw new TypeError('Bad DOM parent.');
+    }
+    this.parent = parent;
+  }
+  draw(board) {
+    console.assert(false, {msg: 'Not implemented'});
+  }
+}
+
+class ASCIIDisplay extends Display {
+  constructor(parent, snake = '#', food = '*') {
+    super(parent);
+    this.snake = snake;
+    this.food = food;
+  }
+  draw(board) {
+    let target = this.parent.querySelector('pre');
+    if (target == null) {
+      this.parent.innerHTML = '';
+      target = document.createElement('pre');
+      this.parent.appendChild(target);
+    }
+
+    let rows = [], border = [];
+    border.push('+');
+    for (let x = 0; x < board.width; x++) {
+      border.push('-');
+    }
+    border.push('+');
+
+    rows.push(border.join(''));
+    for (let y = 0; y < board.height; y++) {
+      let row = [];
+      row.push('|');
+      for (let x = 0; x < board.width; x++) {
+        if (board.snake.some(s => ((s.x == x) && (s.y == y)))) {
+          row.push(this.snake);
+        }
+        else if ((board.food.x == x) && (board.food.y == y)) {
+          row.push(this.food);
+        }
+        else {
+          row.push(' ');
+        }
+      }
+      row.push('|');
+      rows.push(row.join(''));
+    }
+    rows.push(border.join(''));
+    target.textContent = rows.join('\n');
+  }
+}
+
+class CanvasDisplay extends Display {
+  constructor(parent, scale = 20, snakeColor = '#0000FF', foodColor = '#FFFF00') {
+    super(parent);
+    this.scale = scale;
+    this.snakeColor = snakeColor;
+    this.foodColor = foodColor;
+  }
+  draw(board) {
+    let target = this.parent.querySelector('canvas');
+    if (target == null) {
+      this.parent.innerHTML = '';
+      target = document.createElement('canvas');
+      this.parent.appendChild(target);
+    }
+    let width = board.width * this.scale,
+        height = board.height * this.scale;
+    if ((target.width != width) || (target.height != height)) {
+      target.width = width;
+      target.height = height;
+    }
+
+    let context = target.getContext('2d');
+    context.clearRect(0, 0, width, height);
+
+    context.fillStyle = this.snakeColor;
+    for (let s of board.snake) {
+      context.fillRect(s.x * this.scale, s.y * this.scale, this.scale, this.scale);
+    }
+
+    context.fillStyle = this.foodColor;
+    context.fillRect(board.food.x * this.scale, board.food.y * this.scale, this.scale, this.scale);
+  }
+}
+
+class TableDisplay extends Display {
+  constructor(parent) {
+    super(parent);
+  }
+  draw(board) {
+    let target = this.parent.querySelector('table');
+    if (target == null) {
+      this.parent.innerHTML = '';
+      target = document.createElement('table');
+      this.parent.appendChild(target);
+    }
+
+    let rows = [];
+    for (let y = 0; y < board.height; y++) {
+      let row = [];
+      row.push('  <tr>');
+      for (let x = 0; x < board.width; x++) {
+        let cell = '    ';
+        if (board.snake.some(s => ((s.x == x) && (s.y == y)))) {
+          cell += '<td class="snake">';
+        }
+        else if ((board.food.x == x) && (board.food.y == y)) {
+          cell += '<td class="food">';
+        }
+        else {
+          cell += '<td>';
+        }
+        cell += '</td>';
+        row.push(cell);
+      }
+      row.push('  </tr>');
+      rows.push(row.join('\n'));
+    }
+    target.innerHTML = rows.join('\n');
+  }
+}
+
+let output = document.querySelector('#board');
+//let display = new ASCIIDisplay(output);
+let display = new CanvasDisplay(output);
+//let display = new TableDisplay(output);
+
+let board = new Board(30, 30);
+display.draw(board);
+
+window.addEventListener('keydown', (event) => {
+  board.keydown(event);
+});
+
+function runGame() {
+  let lastTime = null, delta = 0;
+  function frame(time) {
+    if (lastTime != null) {
+      delta += time - lastTime;
+      if (delta > board.delay) {
+        board = board.update();
+        display.draw(board);
+        delta = 0;
+      }
+    }
+    lastTime = time;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+runGame();
+</script>
+</body>
+
+</html>
