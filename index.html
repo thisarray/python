@@ -81,12 +81,24 @@ class Board {
   spawnFood() {
     let x = Board.getRandomInteger(0, this.width),
         y = Board.getRandomInteger(0, this.height);
-    while (this.snake.some(s => ((s.x == x) && (s.y == y)))) {
+    while (this.isInSnake(x, y)) {
       // Respawn food if it ends up inside the snake
       x = Board.getRandomInteger(0, this.width);
       y = Board.getRandomInteger(0, this.height);
     }
     this.food = {x: x, y: y};
+  }
+  isAtFood(x, y) {
+    if ((x < 0) || (y < 0) || (x >= this.width) || (y >= this.width)) {
+      return false;
+    }
+    return ((this.food.x == x) && (this.food.y == y));
+  }
+  isInSnake(x, y) {
+    if ((x < 0) || (y < 0) || (x >= this.width) || (y >= this.width)) {
+      return false;
+    }
+    return this.snake.some(s => ((s.x == x) && (s.y == y)));
   }
   update() {
     let board = new Board(this.width, this.height),
@@ -97,7 +109,7 @@ class Board {
       // If the snake hit the wall
       return board;
     }
-    if (this.snake.some(s => ((s.x == x) && (s.y == y)))) {
+    if (this.isInSnake(x, y)) {
       // If the snake ate its own tail
       return board;
     }
@@ -105,7 +117,7 @@ class Board {
     /*
      * At this point, the snake has not collided with the wall or itself
      */
-    if ((this.food.x == x) && (this.food.y == y)) {
+    if (this.isAtFood(x, y)) {
       // If the snake ate the food
       board.snake = this.snake.slice();
       newFood = true;
@@ -151,6 +163,9 @@ class Board {
       this.xSpeed = -1;
       this.ySpeed = 0;
     }
+    if (key.startsWith('Arrow')) {
+      event.preventDefault();
+    }
   }
 
   /*
@@ -170,7 +185,70 @@ class Board {
     console.assert(board.width >= 1,
                    {msg: 'board.width not initialized.'});
     console.assert(board.height >= 1,
-                   {msg: 'board.width not initialized.'});
+                   {msg: 'board.height not initialized.'});
+    console.assert(board.xSpeed == 0,
+                   {msg: 'board.xSpeed not initialized.'});
+    console.assert(board.ySpeed == -1,
+                   {msg: 'board.ySpeed not initialized.'});
+
+    for (let [x, y] of [
+      [-1, 0],
+      [-1, -1],
+      [0, -1],
+      [board.width, 0],
+      [0, board.height],
+      [board.width, board.height]]) {
+      console.assert(!board.isAtFood(x, y),
+                     {msg: 'board.isAtFood unexpectedly out of bounds.'});
+      console.assert(!board.isInSnake(x, y),
+                     {msg: 'board.isInSnake unexpectedly out of bounds.'});
+    }
+    for (let i = 0; i < 5; i++) {
+      for (let x = 0; x < board.width; x++) {
+        for (let y = 0; y < board.height; y++) {
+          if ((board.food.x == x) && (board.food.y == y)) {
+            console.assert(board.isAtFood(x, y),
+                           {msg: 'board.isAtFood is incorrect.'});
+          }
+          else {
+            console.assert(!board.isAtFood(x, y),
+                           {msg: 'board.isAtFood is incorrect.'});
+          }
+
+          if ((x == 5) && ((y == (5 - i)) || (y == (6 - i)) || (y == (7 - i)))) {
+            console.assert(board.snake.some(s => ((s.x == x) && (s.y == y))),
+                           {msg: 'board.isInSnake is incorrect.'});
+            console.assert(board.isInSnake(x, y),
+                           {msg: 'board.isInSnake is incorrect.'});
+          }
+          else {
+            console.assert(!board.isInSnake(x, y),
+                           {msg: 'board.isInSnake is incorrect.'});
+          }
+        }
+      }
+      board = board.update();
+    }
+
+    for (let i = 0; i < 100; i++) {
+      let value = Board.getRandomInteger(0, 10);
+      console.assert(0 <= value,
+                     {msg: 'getRandomInteger() returned a value out of range.'});
+      console.assert(value < 10,
+                     {msg: 'getRandomInteger() returned a value out of range.'});
+
+      board.spawnFood();
+      console.assert(!board.isInSnake(board.food.x, board.food.y),
+                     {msg: 'food unexpectedly spawned in snake.'});
+      console.assert(0 <= board.food.x,
+                     {msg: 'food unexpectedly spawned out of bounds.'});
+      console.assert(board.food.x < board.width,
+                     {msg: 'food unexpectedly spawned out of bounds.'});
+      console.assert(0 <= board.food.y,
+                     {msg: 'food unexpectedly spawned out of bounds.'});
+      console.assert(board.food.y < board.height,
+                     {msg: 'food unexpectedly spawned out of bounds.'});
+    }
   }
 }
 Board.test();
@@ -213,10 +291,10 @@ class ASCIIDisplay extends Display {
       let row = [];
       row.push('|');
       for (let x = 0; x < board.width; x++) {
-        if (board.snake.some(s => ((s.x == x) && (s.y == y)))) {
+        if (board.isInSnake(x, y)) {
           row.push(this.snake);
         }
-        else if ((board.food.x == x) && (board.food.y == y)) {
+        else if (board.isAtFood(x, y)) {
           row.push(this.food);
         }
         else {
@@ -283,10 +361,10 @@ class TableDisplay extends Display {
       row.push('  <tr>');
       for (let x = 0; x < board.width; x++) {
         let cell = '    ';
-        if (board.snake.some(s => ((s.x == x) && (s.y == y)))) {
+        if (board.isInSnake(x, y)) {
           cell += '<td class="snake">';
         }
-        else if ((board.food.x == x) && (board.food.y == y)) {
+        else if (board.isAtFood(x, y)) {
           cell += '<td class="food">';
         }
         else {
