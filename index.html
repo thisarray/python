@@ -30,6 +30,16 @@ pre {
 canvas {
   border: 1px solid black;
 }
+div {
+  position: fixed;
+  height: 20px;
+  width: 20px;
+}
+div.border {
+  border: 1px solid black;
+  top: 0;
+  left: 0;
+}
 table {
   border: 1px solid black;
   border-collapse: collapse;
@@ -343,6 +353,56 @@ class CanvasDisplay extends Display {
   }
 }
 
+class DOMDisplay extends Display {
+  constructor(parent, scale = 20) {
+    super(parent);
+    this.scale = scale;
+  }
+  draw(board) {
+    let segments = Array.from(this.parent.querySelectorAll('div.snake')),
+        difference = board.snake.length - segments.length;
+    if (difference != 0) {
+      if (difference < 0) {
+        this.parent.innerHTML = '';
+        difference = board.snake.length;
+      }
+      for (let i = 0; i < difference; i++) {
+        let node = document.createElement('div');
+        node.className = 'snake';
+        this.parent.appendChild(node);
+        segments.push(node);
+      }
+    }
+
+    let i = 0;
+    for (let s of board.snake) {
+      segments[i].style.left = (s.x * this.scale) + 'px';
+      segments[i].style.top = (s.y * this.scale) + 'px';
+      i += 1;
+    }
+
+    let food = this.parent.querySelector('div.food');
+    if (food == null) {
+      let node = document.createElement('div');
+      node.className = 'food';
+      this.parent.appendChild(node);
+      food = node;
+    }
+    food.style.left = (board.food.x * this.scale) + 'px';
+    food.style.top = (board.food.y * this.scale) + 'px';
+
+    let border = this.parent.querySelector('div.border');
+    if (border == null) {
+      let node = document.createElement('div');
+      node.className = 'border';
+      this.parent.appendChild(node);
+      border = node;
+    }
+    border.style.width = (board.width * this.scale) + 'px';
+    border.style.height = (board.height * this.scale) + 'px';
+  }
+}
+
 class TableDisplay extends Display {
   constructor(parent) {
     super(parent);
@@ -382,7 +442,8 @@ class TableDisplay extends Display {
 
 let output = document.querySelector('#board');
 //let display = new ASCIIDisplay(output);
-let display = new CanvasDisplay(output);
+//let display = new CanvasDisplay(output);
+let display = new DOMDisplay(output);
 //let display = new TableDisplay(output);
 
 let board = new Board(30, 30);
