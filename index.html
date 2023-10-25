@@ -60,21 +60,36 @@ td {
 
 <output id="board"></output>
 
-<p>Guide the snake to the food to help it grow longer.</p>
+<p>Guide the snake to the food with the arrow keys to help it grow longer without running into the wall or itself.</p>
 
-<p>Running Python in the browser.</p>
+<p>If you actually want to run Python in the browser, try <a href="https://pyodide.org/en/stable/console.html">Pyodide</a>.</p>
 </main>
 
 <script>
+/*
+ * Integer size in pixels of each cell.
+ */
+const SCALE = 20;
+
+/*
+ * Integer number of milliseconds to wait between updates.
+ */
+const DELAY = 100;
+
+/*
+ * An immutable representation of the current state.
+ */
 class Board {
   constructor(width, height) {
+    if (typeof width !== 'number') {
+      throw new TypeError('width must be a number.');
+    }
+    if (typeof height !== 'number') {
+      throw new TypeError('height must be a number.');
+    }
+
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
-
-    /*
-     * Number of milliseconds to wait between updates
-     */
-    this.delay = 100;
 
     let centerX = Math.floor(this.width / 2),
         centerY = Math.floor(this.height / 2);
@@ -83,44 +98,100 @@ class Board {
       {x: centerX, y: centerY + 1},
       {x: centerX, y: centerY + 2}
     ]
-    this.spawnFood();
+    this._spawnFood();
 
     this.xSpeed = 0;
     this.ySpeed = -1;
   }
-  spawnFood() {
-    let x = Board.getRandomInteger(0, this.width),
-        y = Board.getRandomInteger(0, this.height);
-    while (this.isInSnake(x, y)) {
-      // Respawn food if it ends up inside the snake
+
+  /*
+   * Randomly respawn food outside of the snake.
+   */
+  _spawnFood() {
+    let x, y;
+    do {
       x = Board.getRandomInteger(0, this.width);
       y = Board.getRandomInteger(0, this.height);
-    }
+    } while (this.isInSnake(x, y));
     this.food = {x: x, y: y};
   }
+
+  /*
+   * Return true if the food is at coordinates (x, y).
+   */
   isAtFood(x, y) {
-    if ((x < 0) || (y < 0) || (x >= this.width) || (y >= this.width)) {
+    if (typeof x !== 'number') {
+      throw new TypeError('x must be a number.');
+    }
+    if (typeof y !== 'number') {
+      throw new TypeError('y must be a number.');
+    }
+
+    if (x < 0) {
       return false;
     }
-    return ((this.food.x == x) && (this.food.y == y));
+    if (y < 0) {
+      return false;
+    }
+    if (this.width <= x) {
+      return false;
+    }
+    if (this.height <= y) {
+      return false;
+    }
+    return ((this.food.x === x) && (this.food.y === y));
   }
+
+  /*
+   * Return true if the coordinates (x, y) is inside the snake.
+   */
   isInSnake(x, y) {
-    if ((x < 0) || (y < 0) || (x >= this.width) || (y >= this.width)) {
+    if (typeof x !== 'number') {
+      throw new TypeError('x must be a number.');
+    }
+    if (typeof y !== 'number') {
+      throw new TypeError('y must be a number.');
+    }
+
+    if (x < 0) {
       return false;
     }
-    return this.snake.some(s => ((s.x == x) && (s.y == y)));
+    if (y < 0) {
+      return false;
+    }
+    if (this.width <= x) {
+      return false;
+    }
+    if (this.height <= y) {
+      return false;
+    }
+    return this.snake.some(s => ((s.x === x) && (s.y === y)));
   }
+
+  /*
+   * Return a new Board instance containing the updated state.
+   */
   update() {
     let board = new Board(this.width, this.height),
         x = this.snake[0].x + this.xSpeed,
         y = this.snake[0].y + this.ySpeed,
         newFood = false;
-    if ((x < 0) || (y < 0) || (x >= this.width) || (y >= this.width)) {
-      // If the snake hit the wall
+
+    // If the snake hit the wall, then return the new Board instance
+    if (x < 0) {
+      return board;
+    }
+    if (y < 0) {
+      return board;
+    }
+    if (this.width <= x) {
+      return board;
+    }
+    if (this.height <= y) {
       return board;
     }
     if (this.isInSnake(x, y)) {
-      // If the snake ate its own tail
+      // If the snake collided with itself, then return the new Board instance
       return board;
     }
 
@@ -133,12 +204,15 @@ class Board {
       newFood = true;
     }
     else {
+      // Otherwise, copy all but the last segment of the snake
+      // Since all the segments are identical, it looks like the snake advanced
       board.snake = this.snake.slice(0, this.snake.length - 1);
     }
+    // Add the new snake head at (x, y)
     board.snake.unshift({x: x, y: y});
 
     if (newFood) {
-      board.spawnFood();
+      board._spawnFood();
     }
     else {
       board.food.x = this.food.x;
@@ -152,39 +226,48 @@ class Board {
   }
 
   /*
-   * Check the key being pressed while
-   * ensuring the snake cannot reverse on itself.
+   * Check the key being pressed while ensuring the snake cannot reverse on itself.
    */
-  keydown(event) {
-    let key = event.key;
-    if ((key == 'ArrowUp') && (this.ySpeed != 1)) {
-      this.xSpeed = 0;
-      this.ySpeed = -1;
+  static keydown(event, board) {
+    let result = new Board(board.width, board.height),
+        key = event.key;
+
+    // Copy the old Board instance
+    result.snake = board.snake.slice();
+    result.food.x = board.food.x;
+    result.food.y = board.food.y;
+    result.xSpeed = board.xSpeed;
+    result.ySpeed = board.ySpeed;
+
+    if ((key === 'ArrowUp') && (board.ySpeed !== 1)) {
+      result.xSpeed = 0;
+      result.ySpeed = -1;
     }
-    if ((key == 'ArrowDown') && (this.ySpeed != -1)) {
-      this.xSpeed = 0;
-      this.ySpeed = 1;
+    if ((key === 'ArrowDown') && (board.ySpeed !== -1)) {
+      result.xSpeed = 0;
+      result.ySpeed = 1;
     }
-    if ((key == 'ArrowRight') && (this.xSpeed != -1)) {
-      this.xSpeed = 1;
-      this.ySpeed = 0;
+    if ((key === 'ArrowRight') && (board.xSpeed !== -1)) {
+      result.xSpeed = 1;
+      result.ySpeed = 0;
     }
-    if ((key == 'ArrowLeft') && (this.xSpeed != 1)) {
-      this.xSpeed = -1;
-      this.ySpeed = 0;
+    if ((key === 'ArrowLeft') && (board.xSpeed !== 1)) {
+      result.xSpeed = -1;
+      result.ySpeed = 0;
     }
     if (key.startsWith('Arrow')) {
       event.preventDefault();
     }
+    return result;
   }
 
   /*
-   * Return a random integer in [min, max).
+   * Return a random integer N such that min <= N < max.
    */
   static getRandomInteger(min, max) {
     min = Math.ceil(min);
     max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min)) + min;
+    return Math.floor((Math.random() * (max - min)) + min);
   }
 
   /*
@@ -193,71 +276,98 @@ class Board {
   static test() {
     let board = new Board(10, 10);
     console.assert(board.width >= 1,
-                   {msg: 'board.width not initialized.'});
+                   {msg: 'board.width is incorrect.'});
     console.assert(board.height >= 1,
-                   {msg: 'board.height not initialized.'});
-    console.assert(board.xSpeed == 0,
-                   {msg: 'board.xSpeed not initialized.'});
-    console.assert(board.ySpeed == -1,
-                   {msg: 'board.ySpeed not initialized.'});
+                   {msg: 'board.height is incorrect.'});
+    console.assert(board.snake.length === 3,
+                   {msg: 'board.snake is incorrect.'});
+    console.assert(board.snake[0].x === 5,
+                   {msg: 'board.snake is incorrect.'});
+    console.assert(board.snake[0].y === 5,
+                   {msg: 'board.snake is incorrect.'});
+    console.assert((0 <= board.food.x) && (board.food.x < board.width),
+                   {msg: 'board.food is incorrect.'});
+    console.assert((0 <= board.food.y) && (board.food.y < board.height),
+                   {msg: 'board.food is incorrect.'});
+    console.assert(board.xSpeed === 0,
+                   {msg: 'board.xSpeed is incorrect.'});
+    console.assert(board.ySpeed === -1,
+                   {msg: 'board.ySpeed is incorrect.'});
+    console.assert(board.isAtFood(board.food.x, board.food.y),
+                   {msg: 'board.isAtFood() failed.'});
+    console.assert(!board.isInSnake(board.food.x, board.food.y),
+                   {msg: 'board.isInSnake() failed.'});
+    console.assert(!board.isAtFood(board.snake[0].x, board.snake[0].y),
+                   {msg: 'board.isAtFood() failed.'});
+    console.assert(board.isInSnake(board.snake[0].x, board.snake[0].y),
+                   {msg: 'board.isInSnake() failed.'});
 
-    for (let [x, y] of [
-      [-1, 0],
-      [-1, -1],
-      [0, -1],
-      [board.width, 0],
-      [0, board.height],
-      [board.width, board.height]]) {
-      console.assert(!board.isAtFood(x, y),
-                     {msg: 'board.isAtFood unexpectedly out of bounds.'});
-      console.assert(!board.isInSnake(x, y),
-                     {msg: 'board.isInSnake unexpectedly out of bounds.'});
-    }
-    for (let i = 0; i < 5; i++) {
-      for (let x = 0; x < board.width; x++) {
-        for (let y = 0; y < board.height; y++) {
-          if ((board.food.x == x) && (board.food.y == y)) {
+    for (let i = 0; i < 6; i++) {
+      for (let x = -1; x <= board.width; x++) {
+        for (let y = -1; y <= board.height; y++) {
+          if ((board.food.x === x) && (board.food.y === y)) {
             console.assert(board.isAtFood(x, y),
-                           {msg: 'board.isAtFood is incorrect.'});
+                           {msg: 'board.isAtFood() failed.'});
           }
           else {
             console.assert(!board.isAtFood(x, y),
-                           {msg: 'board.isAtFood is incorrect.'});
+                           {msg: 'board.isAtFood() failed.'});
           }
 
-          if ((x == 5) && ((y == (5 - i)) || (y == (6 - i)) || (y == (7 - i)))) {
-            console.assert(board.snake.some(s => ((s.x == x) && (s.y == y))),
-                           {msg: 'board.isInSnake is incorrect.'});
+          if ((x === 5) && ((y === (5 - i)) || (y === (6 - i)) || (y === (7 - i)))) {
+            console.assert(board.snake.some(s => ((s.x === x) && (s.y === y))),
+                           {msg: 'board.isInSnake() failed.'});
             console.assert(board.isInSnake(x, y),
-                           {msg: 'board.isInSnake is incorrect.'});
+                           {msg: 'board.isInSnake() failed.'});
           }
           else {
             console.assert(!board.isInSnake(x, y),
-                           {msg: 'board.isInSnake is incorrect.'});
+                           {msg: 'board.isInSnake() failed.'});
           }
         }
       }
       board = board.update();
     }
 
+    console.assert(board.width >= 1,
+                   {msg: 'board.width is incorrect.'});
+    console.assert(board.height >= 1,
+                   {msg: 'board.height is incorrect.'});
+    console.assert(board.snake.length === 3,
+                   {msg: 'board.snake is incorrect.'});
+    console.assert(board.snake[0].x === 5,
+                   {msg: 'board.snake is incorrect.'});
+    console.assert(board.snake[0].y === 5,
+                   {msg: 'board.snake is incorrect.'});
+    console.assert((0 <= board.food.x) && (board.food.x < board.width),
+                   {msg: 'board.food is incorrect.'});
+    console.assert((0 <= board.food.y) && (board.food.y < board.height),
+                   {msg: 'board.food is incorrect.'});
+    console.assert(board.xSpeed === 0,
+                   {msg: 'board.xSpeed is incorrect.'});
+    console.assert(board.ySpeed === -1,
+                   {msg: 'board.ySpeed is incorrect.'});
+    console.assert(board.isAtFood(board.food.x, board.food.y),
+                   {msg: 'board.isAtFood() failed.'});
+    console.assert(!board.isInSnake(board.food.x, board.food.y),
+                   {msg: 'board.isInSnake() failed.'});
+    console.assert(!board.isAtFood(board.snake[0].x, board.snake[0].y),
+                   {msg: 'board.isAtFood() failed.'});
+    console.assert(board.isInSnake(board.snake[0].x, board.snake[0].y),
+                   {msg: 'board.isInSnake() failed.'});
+
     for (let i = 0; i < 100; i++) {
       let value = Board.getRandomInteger(0, 10);
-      console.assert(0 <= value,
-                     {msg: 'getRandomInteger() returned a value out of range.'});
-      console.assert(value < 10,
-                     {msg: 'getRandomInteger() returned a value out of range.'});
+      console.assert((0 <= value) && (value < 10),
+                     {msg: 'Board.getRandomInteger() failed.'});
 
-      board.spawnFood();
+      board._spawnFood();
       console.assert(!board.isInSnake(board.food.x, board.food.y),
-                     {msg: 'food unexpectedly spawned in snake.'});
-      console.assert(0 <= board.food.x,
-                     {msg: 'food unexpectedly spawned out of bounds.'});
-      console.assert(board.food.x < board.width,
-                     {msg: 'food unexpectedly spawned out of bounds.'});
-      console.assert(0 <= board.food.y,
-                     {msg: 'food unexpectedly spawned out of bounds.'});
-      console.assert(board.food.y < board.height,
-                     {msg: 'food unexpectedly spawned out of bounds.'});
+                     {msg: 'board.isInSnake() failed.'});
+      console.assert((0 <= board.food.x) && (board.food.x < board.width),
+                     {msg: 'board.food is incorrect.'});
+      console.assert((0 <= board.food.y) && (board.food.y < board.height),
+                     {msg: 'board.food is incorrect.'});
     }
   }
 }
@@ -270,6 +380,7 @@ class Display {
     }
     this.parent = parent;
   }
+
   draw(board) {
     console.assert(false, {msg: 'Not implemented'});
   }
@@ -281,6 +392,7 @@ class ASCIIDisplay extends Display {
     this.snake = snake;
     this.food = food;
   }
+
   draw(board) {
     let target = this.parent.querySelector('pre');
     if (target == null) {
@@ -320,7 +432,7 @@ class ASCIIDisplay extends Display {
 }
 
 class CanvasDisplay extends Display {
-  constructor(parent, scale = 20, snakeColor = '#0000FF', foodColor = '#FFFF00') {
+  constructor(parent, scale = 20, snakeColor = 'blue', foodColor = 'yellow') {
     super(parent);
     this.scale = scale;
     this.snakeColor = snakeColor;
@@ -440,31 +552,34 @@ class TableDisplay extends Display {
   }
 }
 
-let output = document.querySelector('#board');
-//let display = new ASCIIDisplay(output);
-//let display = new CanvasDisplay(output);
-let display = new DOMDisplay(output);
-//let display = new TableDisplay(output);
-
-let board = new Board(30, 30);
-display.draw(board);
-
-window.addEventListener('keydown', (event) => {
-  board.keydown(event);
-});
+const OUTPUT = document.querySelector('#board');
+let display = new ASCIIDisplay(OUTPUT);
+//let display = new CanvasDisplay(OUTPUT);
+//let display = new DOMDisplay(OUTPUT);
+//let display = new TableDisplay(OUTPUT);
 
 function runGame() {
-  let lastTime = null, delta = 0;
-  function frame(time) {
-    if (lastTime != null) {
-      delta += time - lastTime;
-      if (delta > board.delay) {
+  let board = new Board(30, 30),
+      last = null,
+      delta = 0;
+
+  // Need to wrap Board.keydown to pass board
+  window.addEventListener('keydown', (event) => {
+    board = Board.keydown(event, board);
+  }, true);
+
+  display.draw(board);
+
+  function frame(timestamp) {
+    if (last != null) {
+      delta += timestamp - last;
+      if (delta > DELAY) {
         board = board.update();
         display.draw(board);
         delta = 0;
       }
     }
-    lastTime = time;
+    last = timestamp;
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
