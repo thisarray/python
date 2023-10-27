@@ -12,23 +12,13 @@ body {
 }
 output {
   display: block;
-  margin-bottom: 1em;
-  margin-left: 1em;
-}
-.food {
-  background-color: yellow;
-}
-.snake {
-  background-color: blue;
+  margin: 1em 0;
 }
 pre {
   font-family: "Courier New", monospace;
   font-size: 20px;
   line-height: 20px;
   text-transform: full-width;
-}
-canvas {
-  border: 1px solid black;
 }
 div {
   position: fixed;
@@ -47,8 +37,15 @@ table {
   padding: 0;
 }
 td {
-  height: 20px;
-  width: 20px;
+  /* height and width so resulting cell is 20px by 20px */
+  height: 17px;
+  width: 17px;
+}
+.food {
+  background-color: yellow;
+}
+.snake {
+  background-color: blue;
 }
   </style>
 </head>
@@ -401,14 +398,9 @@ class ASCIIDisplay extends Display {
       this.parent.appendChild(target);
     }
 
-    let rows = [], border = [];
-    border.push('+');
-    for (let x = 0; x < board.width; x++) {
-      border.push('-');
-    }
-    border.push('+');
-
-    rows.push(border.join(''));
+    let border = '+' + '-'.repeat(board.width) + '+',
+        rows = [];
+    rows.push(border);
     for (let y = 0; y < board.height; y++) {
       let row = [];
       row.push('|');
@@ -426,99 +418,87 @@ class ASCIIDisplay extends Display {
       row.push('|');
       rows.push(row.join(''));
     }
-    rows.push(border.join(''));
+    rows.push(border);
     target.textContent = rows.join('\n');
   }
 }
 
 class CanvasDisplay extends Display {
-  constructor(parent, scale = 20, snakeColor = 'blue', foodColor = 'yellow') {
+  constructor(parent, snakeColor = 'blue', foodColor = 'yellow') {
     super(parent);
-    this.scale = scale;
     this.snakeColor = snakeColor;
     this.foodColor = foodColor;
   }
+
   draw(board) {
-    let target = this.parent.querySelector('canvas');
+    let target = this.parent.querySelector('canvas'),
+        width = board.width * SCALE,
+        height = board.height * SCALE,
+        context;
     if (target == null) {
       this.parent.innerHTML = '';
       target = document.createElement('canvas');
       this.parent.appendChild(target);
     }
-    let width = board.width * this.scale,
-        height = board.height * this.scale;
-    if ((target.width != width) || (target.height != height)) {
+    if ((target.width !== width) || (target.height !== height)) {
       target.width = width;
       target.height = height;
     }
 
-    let context = target.getContext('2d');
+    context = target.getContext('2d');
     context.clearRect(0, 0, width, height);
 
     context.fillStyle = this.snakeColor;
     for (let s of board.snake) {
-      context.fillRect(s.x * this.scale, s.y * this.scale, this.scale, this.scale);
+      context.fillRect(s.x * SCALE, s.y * SCALE, SCALE, SCALE);
     }
 
     context.fillStyle = this.foodColor;
-    context.fillRect(board.food.x * this.scale, board.food.y * this.scale, this.scale, this.scale);
+    context.fillRect(board.food.x * SCALE, board.food.y * SCALE, SCALE, SCALE);
+
+    // Outer border
+    context.strokeStyle = 'black';
+    context.beginPath();
+    context.moveTo(1, 1);
+    context.lineTo(width - 1, 1);
+    context.lineTo(width - 1, height - 1);
+    context.lineTo(1, height - 1);
+    context.closePath();
+    context.stroke();
   }
 }
 
 class DOMDisplay extends Display {
-  constructor(parent, scale = 20) {
-    super(parent);
-    this.scale = scale;
-  }
   draw(board) {
-    let segments = Array.from(this.parent.querySelectorAll('div.snake')),
-        difference = board.snake.length - segments.length;
-    if (difference != 0) {
-      if (difference < 0) {
-        this.parent.innerHTML = '';
-        difference = board.snake.length;
-      }
-      for (let i = 0; i < difference; i++) {
-        let node = document.createElement('div');
-        node.className = 'snake';
-        this.parent.appendChild(node);
-        segments.push(node);
-      }
+    let target = this.parent.querySelector('div.border');
+    if (target == null) {
+      this.parent.innerHTML = '';
+      target = document.createElement('div');
+      target.classList.add('border');
+      target.style.width = (board.width * SCALE) + 'px';
+      target.style.height = (board.height * SCALE) + 'px';
+      this.parent.appendChild(target);
     }
 
-    let i = 0;
+    target.innerHTML = '';
+
     for (let s of board.snake) {
-      segments[i].style.left = (s.x * this.scale) + 'px';
-      segments[i].style.top = (s.y * this.scale) + 'px';
-      i += 1;
+      let node = document.createElement('div');
+      node.classList.add('snake');
+      node.style.left = (s.x * SCALE) + 'px';
+      node.style.top = (s.y * SCALE) + 'px';
+      target.appendChild(node);
     }
 
-    let food = this.parent.querySelector('div.food');
-    if (food == null) {
-      let node = document.createElement('div');
-      node.className = 'food';
-      this.parent.appendChild(node);
-      food = node;
-    }
-    food.style.left = (board.food.x * this.scale) + 'px';
-    food.style.top = (board.food.y * this.scale) + 'px';
-
-    let border = this.parent.querySelector('div.border');
-    if (border == null) {
-      let node = document.createElement('div');
-      node.className = 'border';
-      this.parent.appendChild(node);
-      border = node;
-    }
-    border.style.width = (board.width * this.scale) + 'px';
-    border.style.height = (board.height * this.scale) + 'px';
+    let node = document.createElement('div');
+    node.classList.add('food');
+    node.style.left = (board.food.x * SCALE) + 'px';
+    node.style.top = (board.food.y * SCALE) + 'px';
+    target.appendChild(node);
   }
 }
 
 class TableDisplay extends Display {
-  constructor(parent) {
-    super(parent);
-  }
   draw(board) {
     let target = this.parent.querySelector('table');
     if (target == null) {
@@ -527,36 +507,30 @@ class TableDisplay extends Display {
       this.parent.appendChild(target);
     }
 
-    let rows = [];
+    target.innerHTML = '';
     for (let y = 0; y < board.height; y++) {
-      let row = [];
-      row.push('  <tr>');
+      let row = document.createElement('tr');
       for (let x = 0; x < board.width; x++) {
-        let cell = '    ';
+        let cell = document.createElement('td');
+        cell.appendChild(document.createTextNode('    '));
         if (board.isInSnake(x, y)) {
-          cell += '<td class="snake">';
+          cell.classList.add('snake');
         }
         else if (board.isAtFood(x, y)) {
-          cell += '<td class="food">';
+          cell.classList.add('food');
         }
-        else {
-          cell += '<td>';
-        }
-        cell += '</td>';
-        row.push(cell);
+        row.appendChild(cell);
       }
-      row.push('  </tr>');
-      rows.push(row.join('\n'));
+      target.appendChild(row);
     }
-    target.innerHTML = rows.join('\n');
   }
 }
 
 const OUTPUT = document.querySelector('#board');
-let display = new ASCIIDisplay(OUTPUT);
+//let display = new ASCIIDisplay(OUTPUT);
 //let display = new CanvasDisplay(OUTPUT);
 //let display = new DOMDisplay(OUTPUT);
-//let display = new TableDisplay(OUTPUT);
+let display = new TableDisplay(OUTPUT);
 
 function runGame() {
   let board = new Board(30, 30),
