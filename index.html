@@ -30,6 +30,13 @@ div.border {
   top: 0;
   left: 0;
 }
+article {
+  border: 1px solid black;
+  display: grid;
+  grid-auto-rows: 20px;
+  margin: 0;
+  padding: 0;
+}
 table {
   border: 1px solid black;
   border-collapse: collapse;
@@ -498,6 +505,36 @@ class DOMDisplay extends Display {
   }
 }
 
+class GridDisplay extends Display {
+  draw(board) {
+    let target = this.parent.querySelector('article');
+    if (target == null) {
+      this.parent.innerHTML = '';
+      target = document.createElement('article');
+      this.parent.appendChild(target);
+    }
+
+    target.style.width = (board.width * SCALE) + 'px';
+    target.style.height = (board.height * SCALE) + 'px';
+    target.style.gridTemplateColumns = `${ SCALE }px `.repeat(board.width).trim();
+
+    target.innerHTML = '';
+    for (let y = 0; y < board.height; y++) {
+      for (let x = 0; x < board.width; x++) {
+        let cell = document.createElement('section');
+        cell.appendChild(document.createTextNode('    '));
+        if (board.isInSnake(x, y)) {
+          cell.classList.add('snake');
+        }
+        else if (board.isAtFood(x, y)) {
+          cell.classList.add('food');
+        }
+        target.appendChild(cell);
+      }
+    }
+  }
+}
+
 class TableDisplay extends Display {
   draw(board) {
     let target = this.parent.querySelector('table');
@@ -530,7 +567,8 @@ const OUTPUT = document.querySelector('#board');
 //let display = new ASCIIDisplay(OUTPUT);
 //let display = new CanvasDisplay(OUTPUT);
 //let display = new DOMDisplay(OUTPUT);
-let display = new TableDisplay(OUTPUT);
+let display = new GridDisplay(OUTPUT);
+//let display = new TableDisplay(OUTPUT);
 
 function runGame() {
   let board = new Board(30, 30),
